@@ -1,0 +1,2 @@
+examples\prob1\data1
+examples\prob1\data2
