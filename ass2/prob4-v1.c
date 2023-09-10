@@ -133,7 +133,7 @@ void gridloopsearch(
   double e1, e2, e3, e4, e5, e6, e7, e8, e9, e10;
 
   // opening the "results-v0.txt" for writing he results in append mode
-  FILE* fptr = fopen("./results-v0.txt", "w");
+  FILE* fptr = fopen("./results-v1.txt", "w");
   if (fptr == NULL) {
     printf("Error in creating file !");
     exit(1);
@@ -177,33 +177,33 @@ void gridloopsearch(
 
   // grid search starts
   for (int r1 = 0; r1 < s1; ++r1) {
-    x1 = dd1 + r1 * dd3;
 
     for (int r2 = 0; r2 < s2; ++r2) {
-      x2 = dd4 + r2 * dd6;
 
       for (int r3 = 0; r3 < s3; ++r3) {
-        x3 = dd7 + r3 * dd9;
 
         for (int r4 = 0; r4 < s4; ++r4) {
-          x4 = dd10 + r4 * dd12;
 
           for (int r5 = 0; r5 < s5; ++r5) {
-            x5 = dd13 + r5 * dd15;
 
             for (int r6 = 0; r6 < s6; ++r6) {
-              x6 = dd16 + r6 * dd18;
 
               for (int r7 = 0; r7 < s7; ++r7) {
-                x7 = dd19 + r7 * dd21;
 
                 for (int r8 = 0; r8 < s8; ++r8) {
-                  x8 = dd22 + r8 * dd24;
 
                   for (int r9 = 0; r9 < s9; ++r9) {
-                    x9 = dd25 + r9 * dd27;
 
                     for (int r10 = 0; r10 < s10; ++r10) {
+                      x1 = dd1 + r1 * dd3;
+                      x2 = dd4 + r2 * dd6;
+                      x3 = dd7 + r3 * dd9;
+                      x4 = dd10 + r4 * dd12;
+                      x5 = dd13 + r5 * dd15;
+                      x6 = dd16 + r6 * dd18;
+                      x7 = dd19 + r7 * dd21;
+                      x8 = dd22 + r8 * dd24;
+                      x9 = dd25 + r9 * dd27;
                       x10 = dd28 + r10 * dd30;
 
                       // constraints
