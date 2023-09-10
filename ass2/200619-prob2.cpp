@@ -2,112 +2,65 @@
 #include <cstdlib>
 #include <iostream>
 #include <fstream>
-#include <vector>
 #include <string>
-#include <map>
 #include <sstream>
 #include <cctype>
 #include <pthread.h>
+
+#include <tbb/concurrent_map.h>
+#include <tbb/concurrent_queue.h>
+#include <tbb/concurrent_set.h>
+#include <tbb/concurrent_vector.h>
 
 using namespace std;
 
 uint32_t N, M=4;
 
 //struct for X
-class FilesList{
-private:
-    pthread_mutex_t X_mutex;
-    vector<string> X;
-    vector<bool> X_done;
-public:
-    string get_file(){
-        uint32_t f_id;
-        pthread_mutex_lock(&X_mutex);
-        do{
-            f_id = rand() % N;
-        }while(X_done[f_id]);
-        X_done[f_id] = true;
-        pthread_mutex_unlock(&X_mutex);
-        return X[f_id];
-    }
-    void add(string s){
-        pthread_mutex_lock(&X_mutex);
-        X.push_back(s);
-        X_done.push_back(false);
-        pthread_mutex_unlock(&X_mutex);
-    }
-};
-FilesList X;
-
+tbb::concurrent_vector<string> X;
+tbb::concurrent_set<uint32_t> X_done;
+string get_file(){
+    uint32_t f_id;
+    do{
+        f_id = rand() % N;
+    }while(X_done.contains(f_id));
+    X_done.insert(f_id);
+    return X[f_id];
+}
 
 // struct for Y
-template <typename T, uint32_t size>
-class FixedQueue{
+template <typename T>
+class FixedQueue : public tbb::concurrent_bounded_queue<T>{
 private:
-    T data[size+1];
-    pthread_mutex_t Y_mutex = PTHREAD_MUTEX_INITIALIZER;
-    pthread_cond_t Y_empty = PTHREAD_COND_INITIALIZER;
-    pthread_cond_t Y_full = PTHREAD_COND_INITIALIZER;
-    uint32_t r=0, w=1;
-    bool more = true;
+    T eof;
 
 public:
-    void push(T s){
-        pthread_mutex_lock(&Y_mutex);
-
-        while(r == w)
-            pthread_cond_wait(&Y_full, &Y_mutex);
-
-        data[w] = s;
-        w = (w + 1) % (size + 1);
-
-        if((r + 1) % (size + 1) != w)
-            pthread_cond_signal(&Y_empty);
-
-        pthread_mutex_unlock(&Y_mutex);
+    FixedQueue(uint32_t n){
+        tbb::concurrent_bounded_queue<T>::set_capacity(n);
     }
-    T pop(int* ret){
+    T pop(int *ret){
         T s;
         *ret = 0;
-        pthread_mutex_lock(&Y_mutex);
+        tbb::concurrent_bounded_queue<T>::pop(s);
 
-        while((r + 1) % (size + 1) == w)
-        {
-            if(!more){
-                pthread_mutex_unlock(&Y_mutex);
-                *ret = -1;
-                return s;
-            }
-            pthread_cond_wait(&Y_empty, &Y_mutex);
+        if(s == eof){
+            *ret = -1;
+            tbb::concurrent_bounded_queue<T>::push(eof);
         }
-
-
-        r = (r + 1) % (size + 1);
-        s = data[r];
-
-        if(r != w)
-            pthread_cond_signal(&Y_full);
-
-        pthread_mutex_unlock(&Y_mutex);
         return s;
     }
     void end(){
-        pthread_mutex_lock(&Y_mutex);
-        more = false;
-        if((r + 1) % (size + 1) == w)
-            pthread_cond_broadcast(&Y_empty);
-        pthread_mutex_unlock(&Y_mutex);
+        tbb::concurrent_bounded_queue<T>::push(eof);
     }
 };
-FixedQueue<string,10> Y;
+FixedQueue<string> Y(10);
 
-pthread_mutex_t Z_mutex;
-map<string,uint32_t> Z;
+tbb::concurrent_map<string,uint32_t> Z;
 
 void* producer(void* arg) {
     // select a file randomly from X
     string file;
-    file = X.get_file();
+    file = get_file();
 
     // Reading selected file
     ifstream fin;
@@ -145,9 +98,9 @@ void* consumer(void* arg) {
         while(ss >> word){
             string cleanWord = removePunctuation(word);
             if (!cleanWord.empty()) {
-                pthread_mutex_lock(&Z_mutex);
+
                 Z[cleanWord]++;
-                pthread_mutex_unlock(&Z_mutex);
+
             }
         }
     }
@@ -156,7 +109,6 @@ void* consumer(void* arg) {
 }
 
 int main() {
-
     string infile;
     cout<<"Input file :";
     cin>>infile;
@@ -166,7 +118,7 @@ int main() {
 
     string line;
     while(getline(fin,line)){
-        X.add(line);
+        X.push_back(line);
         N++;
     }
     fin.close();
@@ -213,11 +165,9 @@ int main() {
         }
     }
 
-    pthread_mutex_lock(&Z_mutex);
     for(auto i : Z){
         cout<<i.first<<" "<<i.second<<endl;
     }
-    pthread_mutex_unlock(&Z_mutex);
 
     pthread_exit(NULL);
 }
