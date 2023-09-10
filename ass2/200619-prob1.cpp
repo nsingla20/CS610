@@ -49,6 +49,7 @@ private:
     pthread_cond_t Y_empty = PTHREAD_COND_INITIALIZER;
     pthread_cond_t Y_full = PTHREAD_COND_INITIALIZER;
     uint32_t r=0, w=1;
+    bool more = true;
 
 public:
     void push(T s){
@@ -70,7 +71,14 @@ public:
         pthread_mutex_lock(&Y_mutex);
 
         while((r + 1) % (size + 1) == w)
+        {
+            if(!more){
+                pthread_mutex_unlock(&Y_mutex);
+                return s;
+            }
             pthread_cond_wait(&Y_empty, &Y_mutex);
+        }
+
 
         r = (r + 1) % (size + 1);
         s = data[r];
@@ -80,6 +88,13 @@ public:
 
         pthread_mutex_unlock(&Y_mutex);
         return s;
+    }
+    void end(){
+        pthread_mutex_lock(&Y_mutex);
+        more = false;
+        if((r + 1) % (size + 1) == w)
+            pthread_cond_broadcast(&Y_empty);
+        pthread_mutex_unlock(&Y_mutex);
     }
 };
 FixedQueue<string,10> Y;
@@ -97,7 +112,7 @@ void* producer(void* arg) {
     fin.open(file);
     string line;
     while(getline(fin,line)){
-        Y.push(line);
+        if(!line.empty())Y.push(line);
     }
     fin.close();
 
@@ -116,18 +131,21 @@ string removePunctuation(const string& word) {
 }
 void* consumer(void* arg) {
 
-    // get a line from Y
-    string line = Y.pop();
+    while(true){
+        // get a line from Y
+        string line = Y.pop();
+        if(line.empty())break;
 
-    stringstream ss(line);
-    string word;
+        stringstream ss(line);
+        string word;
 
-    while(ss >> word){
-        string cleanWord = removePunctuation(word);
-        if (!cleanWord.empty()) {
-            pthread_mutex_lock(&Z_mutex);
-            Z[cleanWord]++;
-            pthread_mutex_unlock(&Z_mutex);
+        while(ss >> word){
+            string cleanWord = removePunctuation(word);
+            if (!cleanWord.empty()) {
+                pthread_mutex_lock(&Z_mutex);
+                Z[cleanWord]++;
+                pthread_mutex_unlock(&Z_mutex);
+            }
         }
     }
 
@@ -176,13 +194,6 @@ int main() {
         }
     }
 
-    for (uint32_t id = 0; id < M; id++) {
-        errcode = pthread_join(consumers[id], NULL);
-        if (errcode) {
-            std::cout << "ERROR: return code from pthread_join() is " << errcode << "\n";
-            exit(-1);
-        }
-    }
     for (uint32_t id = 0; id < N; id++) {
         errcode = pthread_join(producers[id], NULL);
         if (errcode) {
@@ -190,10 +201,20 @@ int main() {
             exit(-1);
         }
     }
+    Y.end();
+    for (uint32_t id = 0; id < M; id++) {
+        errcode = pthread_join(consumers[id], NULL);
+        if (errcode) {
+            std::cout << "ERROR: return code from pthread_join() is " << errcode << "\n";
+            exit(-1);
+        }
+    }
 
+    pthread_mutex_lock(&Z_mutex);
     for(auto i : Z){
         cout<<i.first<<" "<<i.second<<endl;
     }
+    pthread_mutex_unlock(&Z_mutex);
 
     pthread_exit(NULL);
 }
