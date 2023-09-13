@@ -14,6 +14,8 @@
 
 using namespace std;
 
+// compile command :  g++ 200619-prob2.cpp -ltbb
+
 uint32_t N, M=4;
 
 //struct for X
