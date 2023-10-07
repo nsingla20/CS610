@@ -4,6 +4,8 @@
 #include <iostream>
 #include <sys/time.h>
 #include <unistd.h>
+#include <emmintrin.h>
+#include <immintrin.h>
 
 using std::cout;
 using std::endl;
@@ -12,6 +14,8 @@ using std::ios;
 const int N = (1 << 13);
 const int Niter = 10;
 const double THRESHOLD = 0.000001;
+
+__attribute__((aligned(16))) double A_align[N][N],z_opt_align[N],x_align[N],y_opt_align[N];
 
 double rtclock() {
   struct timezone Tzp;
@@ -56,16 +60,67 @@ void check_result(const double* w_ref, const double* w_opt) {
 
 // TODO: INITIALLY IDENTICAL TO REFERENCE; MAKE YOUR CHANGES TO OPTIMIZE THE CODE
 // You can create multiple versions of the optimized() function to test your changes
-void optimized(double** A, const double* x, double* y_opt, double* z_opt) {
-  for (int i = 0; i < N; i++) {
-    for (int j = 0; j < N; j++) {
+void optimized(double** __restrict__ A, const double* __restrict__ x, double* __restrict__ y_opt, double* __restrict__ z_opt) {
+  __builtin_assume_aligned(A, 16);
+  __builtin_assume_aligned(x, 16);
+  __builtin_assume_aligned(y_opt, 16);
+  __builtin_assume_aligned(z_opt, 16);
+
+  int i, j;
+  for (i = 0; i < N; i++) {
+    #pragma GCC ivdep
+    for (j = 0; j < N; j++) {
       y_opt[j] = y_opt[j] + A[i][j] * x[i];
+
+    }
+  }
+  for(j = 0; j < N; j++){
+    #pragma GCC ivdep
+    for(i=0;  i < N; i++) {
       z_opt[j] = z_opt[j] + A[j][i] * x[i];
     }
   }
 }
 
-void avx_version(double** A, double* x, double* y_opt, double* z_opt) {}
+void avx_version(double** A, double* x, double* y_opt, double* z_opt) {
+
+  int i, j;
+  double* base;
+
+
+
+  for (i = 0; i < N; i++) {
+    __m256d x_avx, y_avx, A_avx;
+
+    base = A[i];
+    x_avx = _mm256_set1_pd(x[i]);
+
+    for (j = 0; j < N; j += 4) {
+      A_avx = _mm256_load_pd(base+j);
+      y_avx = _mm256_load_pd(y_opt+j);
+
+      y_avx = _mm256_fmadd_pd(A_avx, x_avx, y_avx);
+      _mm256_storeu_pd(y_opt+j, y_avx);
+    }
+  }
+
+  for (j = 0; j < N; j++) {
+    __m256d x_avx, z_avx, A_avx;
+
+    base = A[j];
+    x_avx = _mm256_set1_pd(x[j]);
+
+    for (i = 0; i < N; i += 4) {
+      A_avx = _mm256_load_pd(base+i);
+      z_avx = _mm256_load_pd(z_opt+i);
+
+      z_avx = _mm256_fmadd_pd(A_avx, x_avx, z_avx);
+      _mm256_storeu_pd(z_opt+i, z_avx);
+    }
+  }
+
+  return;
+}
 
 int main() {
   double clkbegin, clkend;
@@ -77,15 +132,15 @@ int main() {
   double** A;
   A = new double*[N];
   for (int i = 0; i < N; i++) {
-    A[i] = new double[N];
+    A[i] = &A_align[i][0];
   }
 
   double *x, *y_ref, *z_ref, *y_opt, *z_opt;
-  x = new double[N];
+  x = &x_align[0];
   y_ref = new double[N];
   z_ref = new double[N];
-  y_opt = new double[N];
-  z_opt = new double[N];
+  y_opt = &y_opt_align[0];
+  z_opt = &z_opt_align[0];
 
   for (int i = 0; i < N; i++) {
     x[i] = i;
