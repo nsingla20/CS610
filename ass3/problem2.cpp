@@ -12,7 +12,7 @@ using std::endl;
 #define N (1 << 24)
 
 // Number of array elements a task will process
-#define GRANULARITY (1 << 10)
+#define GRANULARITY (1 << 20)
 
 uint64_t reference_sum(uint32_t* A) {
   uint64_t seq_sum = 0;
@@ -24,17 +24,55 @@ uint64_t reference_sum(uint32_t* A) {
 
 uint64_t par_sum_omp_nored(uint32_t* A) {
   // SB: Write your OpenMP code here
-  return 0;
+  uint64_t sum = 0;
+
+  #pragma omp parallel for
+  for (int i = 0; i < N; i++) {
+      #pragma omp atomic
+      sum += A[i];
+  }
+
+  return sum;
 }
 
 uint64_t par_sum_omp_red(uint32_t* A) {
   // SB: Write your OpenMP code here
-  return 0;
+  uint64_t sum = 0;
+
+  #pragma omp parallel for reduction(+:sum)
+  for (int i = 0; i < N; i++) {
+      sum += A[i];
+  }
+
+  return sum;
 }
 
 uint64_t par_sum_omp_tasks(uint32_t* A) {
   // SB: Write your OpenMP code here
-  return 0;
+  uint64_t sum = 0;
+
+  // I will be using task based reduction for optimal performance and library validity :)
+
+  #pragma omp parallel
+  {
+    #pragma omp single
+    {
+      #pragma omp taskgroup task_reduction(+:sum)
+      {
+        for (int i = 0; i < N; i += GRANULARITY) {
+          #pragma omp task firstprivate(i) in_reduction(+ : sum)
+          {
+            int end = (i + GRANULARITY < N) ? i + GRANULARITY : N;
+            for (int j = i; j < end; j++) {                 // We can also parallelize this loop if GRANULARITY is large value
+                sum += A[j];
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return sum;
 }
 
 int main() {
