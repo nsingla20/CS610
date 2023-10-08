@@ -1,3 +1,4 @@
+// Compile : gcc -O3 -std=c17 -D_POSIX_C_SOURCE=199309L -fopenmp 200619-prob4-v3.c
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
