@@ -1,5 +1,7 @@
 // Compile: nvcc -arch=sm_80 -ccbin /usr/bin/g++-10 200619_prob2.cu -o 200619_prob2
 
+// NOTE : This code allows only uint32_t type elements in array
+
 #include <cuda.h>
 #include <iostream>
 #include <thrust/host_vector.h>
