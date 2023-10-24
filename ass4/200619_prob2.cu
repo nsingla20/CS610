@@ -171,6 +171,7 @@ int main() {
 	// const int N = N%(2*NUM_TH_PER_BLCK)==0?N:N+2*NUM_TH_PER_BLCK-N%(2*NUM_TH_PER_BLCK);
 	size_t size = N * sizeof(uint32_t);
 
+	// Input array (change this, keep its element uint32_t)
 	uint32_t* in = (uint32_t*)malloc(size);
 	std::fill_n(in, N, 1);			// Filling with 1
 
