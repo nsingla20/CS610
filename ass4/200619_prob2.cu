@@ -189,8 +189,9 @@ int main() {
   cudaMalloc((void**)&d_out, size);
 	cudaMalloc((void**)&sums, size);
 
-	uint32_t* cuda_res = (uint32_t*)malloc(size);
-	std::fill_n(cuda_res, N, 0);
+	uint32_t* cuda_res;
+	cudaHostAlloc(&cuda_res, size, cudaHostAllocDefault);
+	memset(cuda_res,0,size);
 
   cudaMemcpy(d_in, in, size, cudaMemcpyHostToDevice);
 
@@ -215,7 +216,7 @@ int main() {
 	cudaFree(d_in);
 	cudaFree(d_out);
 
-	free(cuda_res);
+	cudaFreeHost(cuda_res);
 	free(thrust_res);
 	free(in);
 
